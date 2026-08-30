@@ -7,3 +7,7 @@ google-adk>=2.8.0        # for llm.adk_backend.ADKBackend -- preferred --live ba
 google-genai>=0.3.0        # for llm.gemini.GeminiBackend -- fallback if google-adk isn't installed
 python-dotenv>=1.0.0          # so main.py can load .env automatically
 pytest>=7.0                     # to run tests/
+
+# for the web app (web/server.py) -- not needed for the CLI (main.py):
+fastapi>=0.110.0
+uvicorn>=0.29.0

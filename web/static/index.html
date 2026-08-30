@@ -1,0 +1,339 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Companio</title>
+<style>
+  :root {
+    --bg: #0d1117; --panel: #161b22; --border: #30363d; --text: #c9d1d9; --text-bright: #e6edf3;
+    --muted: #8b949e; --accent: #58a6ff; --purple: #d2a8ff; --green: #56d364; --orange: #f0883e;
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--text); font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; height:100vh; overflow:hidden; }
+  .app { display:flex; height:100vh; }
+
+  /* sidebar */
+  .sidebar { width: 300px; border-right:1px solid var(--border); display:flex; flex-direction:column; background:var(--panel); flex-shrink:0; }
+  .brand { padding:16px; border-bottom:1px solid var(--border); }
+  .brand h1 { font-size:16px; margin:0 0 2px; color:var(--text-bright); }
+  .brand .tag { font-size:11.5px; color:var(--muted); }
+  .setup { padding:12px 16px; border-bottom:1px solid var(--border); display:flex; flex-direction:column; gap:8px; }
+  .setup label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.03em; }
+  .setup input, .setup select { background:#0d1117; border:1px solid var(--border); color:var(--text-bright); border-radius:6px; padding:7px 9px; font-size:13px; width:100%; }
+
+  .section { padding:12px 16px; border-bottom:1px solid var(--border); overflow-y:auto; }
+  .section h2 { font-size:11px; text-transform:uppercase; letter-spacing:.04em; color:var(--muted); margin:0 0 10px; }
+  .section.grow { flex:1; min-height:80px; }
+
+  .fact { background:#0d1117; border:1px solid var(--border); border-radius:8px; padding:8px 10px; margin-bottom:8px; }
+  .fact-top { display:flex; justify-content:space-between; align-items:center; gap:6px; }
+  .fact-label { font-size:12.5px; color:var(--text-bright); }
+  .fact-forget { background:none; border:none; color:var(--muted); cursor:pointer; font-size:11px; }
+  .fact-forget:hover { color:#f85149; }
+  .fact-bar-track { height:4px; background:#21262d; border-radius:2px; margin-top:6px; overflow:hidden; }
+  .fact-bar { height:100%; background:var(--green); }
+  .fact-meta { font-size:10.5px; color:var(--muted); margin-top:4px; }
+  .fact.pending { border-color:var(--orange); }
+  .pending-actions { display:flex; gap:6px; margin-top:8px; }
+  .pending-actions button { flex:1; font-size:11px; padding:5px; border-radius:5px; border:1px solid var(--border); background:#0d1117; color:var(--text); cursor:pointer; }
+  .pending-actions button.accept { border-color:var(--green); color:var(--green); }
+  .pending-actions button.reject { border-color:#f85149; color:#f85149; }
+
+  .empty { color:var(--muted); font-size:12px; font-style:italic; }
+
+  .feed-row { font-size:11px; color:var(--muted); font-family: Menlo, Consolas, monospace; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .feed-row .src { color:var(--accent); }
+
+  .metric-row { display:flex; justify-content:space-between; font-size:12px; padding:4px 0; border-bottom:1px dashed #21262d; }
+  .metric-row .k { color:var(--muted); }
+  .metric-row .v { color:var(--text-bright); font-family: Menlo, Consolas, monospace; }
+
+  /* chat */
+  .chat { flex:1; display:flex; flex-direction:column; min-width:0; }
+  .chat-header { padding:14px 20px; border-bottom:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; }
+  .chat-header .who { font-size:13px; color:var(--text-bright); }
+  .chat-header .who span { color:var(--muted); }
+  .messages { flex:1; overflow-y:auto; padding:20px; display:flex; flex-direction:column; gap:14px; }
+  .msg { max-width:640px; }
+  .msg.user { align-self:flex-end; }
+  .msg.agent { align-self:flex-start; }
+  .bubble { padding:10px 14px; border-radius:12px; font-size:14px; line-height:1.55; }
+  .msg.user .bubble { background:var(--accent); color:#04101c; border-bottom-right-radius:3px; }
+  .msg.agent .bubble { background:var(--panel); border:1px solid var(--border); color:var(--text); border-bottom-left-radius:3px; }
+  .msg.agent.ask .bubble { border-color:var(--orange); }
+  .msg-meta { font-size:10.5px; color:var(--muted); margin-top:4px; display:flex; gap:8px; align-items:center; }
+  .tag { padding:1px 6px; border-radius:4px; font-size:9.5px; text-transform:uppercase; letter-spacing:.03em; }
+  .tag.ask { background:#3d2b12; color:var(--orange); }
+  .tag.proceed { background:#132d1c; color:var(--green); }
+  .tag.profile { background:#241a3d; color:var(--purple); }
+  .fb-btns { display:flex; gap:6px; margin-top:6px; }
+  .fb-btns button { background:none; border:1px solid var(--border); color:var(--muted); border-radius:5px; padding:2px 8px; font-size:12px; cursor:pointer; }
+  .fb-btns button:hover { border-color:var(--accent); color:var(--accent); }
+  .fb-btns button.done { color:var(--green); border-color:var(--green); }
+
+  .composer { padding:16px 20px; border-top:1px solid var(--border); display:flex; gap:10px; }
+  .composer input { flex:1; background:var(--panel); border:1px solid var(--border); color:var(--text-bright); border-radius:8px; padding:11px 14px; font-size:14px; }
+  .composer input:focus { outline:none; border-color:var(--accent); }
+  .composer button { background:var(--accent); color:#04101c; border:none; border-radius:8px; padding:0 20px; font-weight:600; cursor:pointer; }
+  .composer button:disabled { opacity:.5; cursor:default; }
+
+  ::-webkit-scrollbar { width:8px; } ::-webkit-scrollbar-thumb { background:#30363d; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="sidebar">
+    <div class="brand">
+      <h1>Companio</h1>
+      <div class="tag">remembers you specifically</div>
+    </div>
+    <div class="setup">
+      <div>
+        <label for="userId">User</label>
+        <input id="userId" value="demo-user" />
+      </div>
+      <div>
+        <label for="domainSel">Domain</label>
+        <select id="domainSel">
+          <option value="general">general</option>
+          <option value="study">study</option>
+        </select>
+      </div>
+    </div>
+    <div class="section" id="pendingSection" style="display:none;">
+      <h2>Needs confirmation</h2>
+      <div id="pendingList"></div>
+    </div>
+    <div class="section grow" style="overflow-y:auto;">
+      <h2>Profile (what it knows)</h2>
+      <div id="profileList"><div class="empty">Nothing learned yet.</div></div>
+    </div>
+    <div class="section" style="max-height:160px;">
+      <h2>Live feed</h2>
+      <div id="feedList"><div class="empty">No activity yet.</div></div>
+    </div>
+    <div class="section">
+      <h2>Session metrics</h2>
+      <div id="metricsList"><div class="empty">No turns yet.</div></div>
+    </div>
+  </div>
+
+  <div class="chat">
+    <div class="chat-header">
+      <div class="who">Talking as <span id="whoName">demo-user</span> &middot; <span id="whoDomain">general</span></div>
+    </div>
+    <div class="messages" id="messages">
+      <div class="empty" style="padding:20px;">Say something to get started.</div>
+    </div>
+    <div class="composer">
+      <input id="textInput" placeholder="Type a message..." autocomplete="off" />
+      <button id="sendBtn">Send</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const messagesEl = document.getElementById('messages');
+const userIdEl = document.getElementById('userId');
+const domainSelEl = document.getElementById('domainSel');
+const textInputEl = document.getElementById('textInput');
+const sendBtnEl = document.getElementById('sendBtn');
+
+let lastEventId = null;
+
+function currentUser() { return userIdEl.value.trim() || 'demo-user'; }
+function currentDomain() { return domainSelEl.value; }
+function qs(params) { return Object.entries(params).map(([k,v]) => `${encodeURIComponent(k)}=${encodeURIComponent(v)}`).join('&'); }
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  if (!res.ok) throw new Error(await res.text());
+  return res.json();
+}
+
+function clearEmpty(el) { const e = el.querySelector('.empty'); if (e && el.children.length === 1) el.innerHTML = ''; }
+
+function addMessage(role, text, meta) {
+  clearEmpty(messagesEl);
+  const wrap = document.createElement('div');
+  wrap.className = 'msg ' + role + (meta && meta.asked_clarifying ? ' ask' : '');
+  const bubble = document.createElement('div');
+  bubble.className = 'bubble';
+  bubble.textContent = text;
+  wrap.appendChild(bubble);
+
+  if (role === 'agent' && meta) {
+    const metaRow = document.createElement('div');
+    metaRow.className = 'msg-meta';
+    const tag = document.createElement('span');
+    tag.className = 'tag ' + (meta.asked_clarifying ? 'ask' : 'proceed');
+    tag.textContent = meta.asked_clarifying ? 'ask' : 'proceed';
+    metaRow.appendChild(tag);
+    if (meta.used_profile) {
+      const pTag = document.createElement('span');
+      pTag.className = 'tag profile';
+      pTag.textContent = 'used profile';
+      metaRow.appendChild(pTag);
+    }
+    const conf = document.createElement('span');
+    conf.textContent = 'confidence ' + meta.confidence;
+    metaRow.appendChild(conf);
+    wrap.appendChild(metaRow);
+
+    const fb = document.createElement('div');
+    fb.className = 'fb-btns';
+    const up = document.createElement('button'); up.textContent = '👍';
+    const down = document.createElement('button'); down.textContent = '👎';
+    up.onclick = () => sendFeedback('up', up, down);
+    down.onclick = () => sendFeedback('down', up, down);
+    fb.appendChild(up); fb.appendChild(down);
+    wrap.appendChild(fb);
+  }
+  messagesEl.appendChild(wrap);
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function sendFeedback(rating, up, down) {
+  up.disabled = true; down.disabled = true;
+  (rating === 'up' ? up : down).classList.add('done');
+  await api('/api/feedback', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ user_id: currentUser(), domain: currentDomain(), rating })
+  });
+  refreshSidebar();
+}
+
+async function sendTurn() {
+  const text = textInputEl.value.trim();
+  if (!text) return;
+  textInputEl.value = '';
+  sendBtnEl.disabled = true;
+  addMessage('user', text);
+  try {
+    const result = await api('/api/turn', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({ user_id: currentUser(), domain: currentDomain(), text })
+    });
+    addMessage('agent', result.response, result);
+  } catch (e) {
+    addMessage('agent', '[error] ' + e.message, {});
+  } finally {
+    sendBtnEl.disabled = false;
+    refreshSidebar();
+  }
+}
+
+sendBtnEl.onclick = sendTurn;
+textInputEl.addEventListener('keydown', (e) => { if (e.key === 'Enter') sendTurn(); });
+
+async function refreshProfile() {
+  const el = document.getElementById('profileList');
+  const pendingSection = document.getElementById('pendingSection');
+  const pendingList = document.getElementById('pendingList');
+  const facts = await api('/api/profile?' + qs({ user_id: currentUser(), domain: currentDomain() }));
+  const active = facts.filter(f => f.status === 'active');
+  const pending = facts.filter(f => f.status === 'pending_confirmation');
+
+  el.innerHTML = '';
+  if (active.length === 0) el.innerHTML = '<div class="empty">Nothing learned yet.</div>';
+  for (const f of active) {
+    const card = document.createElement('div');
+    card.className = 'fact';
+    card.innerHTML = `
+      <div class="fact-top"><span class="fact-label">${f.label}</span><button class="fact-forget" data-key="${f.key}">forget</button></div>
+      <div class="fact-bar-track"><div class="fact-bar" style="width:${Math.round(f.confidence*100)}%"></div></div>
+      <div class="fact-meta">confidence ${f.confidence} &middot; evidence ${f.concentration ?? '-'}</div>`;
+    card.querySelector('.fact-forget').onclick = async () => {
+      await api(`/api/profile/${encodeURIComponent(f.key)}?` + qs({ user_id: currentUser(), domain: currentDomain() }), { method: 'DELETE' });
+      refreshSidebar();
+    };
+    el.appendChild(card);
+  }
+
+  if (pending.length === 0) { pendingSection.style.display = 'none'; }
+  else {
+    pendingSection.style.display = 'block';
+    pendingList.innerHTML = '';
+    for (const f of pending) {
+      const card = document.createElement('div');
+      card.className = 'fact pending';
+      card.innerHTML = `<div class="fact-label">${f.label}</div><div class="fact-meta">was "${f.value}" &rarr; now "${f.pending_value}"?</div>`;
+      const actions = document.createElement('div');
+      actions.className = 'pending-actions';
+      const acc = document.createElement('button'); acc.className = 'accept'; acc.textContent = 'accept new';
+      const rej = document.createElement('button'); rej.className = 'reject'; rej.textContent = 'keep old';
+      acc.onclick = async () => { await resolvePending(f.key, true); };
+      rej.onclick = async () => { await resolvePending(f.key, false); };
+      actions.appendChild(acc); actions.appendChild(rej);
+      card.appendChild(actions);
+      pendingList.appendChild(card);
+    }
+  }
+}
+
+async function resolvePending(key, accept) {
+  await api('/api/resolve_pending', {
+    method: 'POST', headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ user_id: currentUser(), domain: currentDomain(), key, accept_update: accept })
+  });
+  refreshSidebar();
+}
+
+async function refreshFeed() {
+  const el = document.getElementById('feedList');
+  const rows = await api('/api/feed?' + qs({ user_id: currentUser(), domain: currentDomain(), n: 10 }));
+  if (rows.length === 0) { el.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
+  el.innerHTML = '';
+  for (const r of rows.slice().reverse()) {
+    const row = document.createElement('div');
+    row.className = 'feed-row';
+    row.innerHTML = `<span class="src">${r.source}</span> | ${r.event_type}`;
+    el.appendChild(row);
+  }
+}
+
+async function refreshMetrics() {
+  const el = document.getElementById('metricsList');
+  const rows = await api('/api/metrics?' + qs({ user_id: currentUser(), domain: currentDomain() }));
+  if (rows.length === 0) { el.innerHTML = '<div class="empty">No turns yet.</div>'; return; }
+  const s = rows[rows.length - 1];
+  el.innerHTML = '';
+  for (const [k, v] of Object.entries(s)) {
+    if (k === 'session_id') continue;
+    const row = document.createElement('div');
+    row.className = 'metric-row';
+    row.innerHTML = `<span class="k">${k}</span><span class="v">${v}</span>`;
+    el.appendChild(row);
+  }
+}
+
+function refreshSidebar() {
+  refreshProfile();
+  refreshFeed();
+  refreshMetrics();
+}
+
+async function loadDomains() {
+  const domains = await api('/api/domains');
+  domainSelEl.innerHTML = domains.map(d => `<option value="${d.id}">${d.id}</option>`).join('');
+}
+
+async function startSession() {
+  document.getElementById('whoName').textContent = currentUser();
+  document.getElementById('whoDomain').textContent = currentDomain();
+  messagesEl.innerHTML = '<div class="empty" style="padding:20px;">Say something to get started.</div>';
+  await api('/api/session?' + qs({ user_id: currentUser(), domain: currentDomain() }), { method: 'POST' });
+  refreshSidebar();
+}
+
+userIdEl.addEventListener('change', startSession);
+domainSelEl.addEventListener('change', startSession);
+
+(async function init() {
+  await loadDomains();
+  await startSession();
+})();
+</script>
+</body>
+</html>

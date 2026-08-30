@@ -24,6 +24,23 @@ python main.py --domain study --live    # real Gemini, via ADK if installed
 Profile/memory persists to `companion.db` next to `main.py` across runs;
 pass `--fresh` for a throwaway in-memory session instead.
 
+### Web app
+
+A browser chat UI over the same `Companion` class the CLI drives — no
+separate agent logic, `web/server.py` just calls the same `turn()` /
+`give_feedback()` / `profile()` / `live_feed()` / `adaptation_metrics()`
+methods `main.py` does, over HTTP.
+
+```bash
+pip install fastapi uvicorn   # or: pip install -r requirements.txt
+python web/server.py
+# open http://localhost:8000
+```
+
+The sidebar mirrors the CLI's `:profile` / `:feed` / `:metrics`
+commands live as you chat, plus one-click accept/keep on any fact
+staged as `pending_confirmation` by the Consolidator.
+
 ## File map
 
 ```
@@ -63,6 +80,10 @@ companion/
     test_ingest.py                          anonymization + safety-filter, on synthetic data
     test_llm_backends.py                     backend fail-fast paths (skipped if the optional
                                               google-adk/google-genai packages aren't installed)
+  web/
+    server.py                             FastAPI wrapper -- every endpoint calls straight into
+                                           agent.py, no logic of its own (pip install fastapi uvicorn)
+    static/index.html                      chat UI + a live profile/feed/metrics sidebar
 ```
 
 ## Why two Gemini backends

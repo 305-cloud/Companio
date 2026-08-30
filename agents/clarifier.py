@@ -59,7 +59,7 @@ class Clarifier:
         bias: float = -1.6,
         tau_lo: float = 0.35,
         tau_hi: float = 0.75,
-        tau_entropy: float = 0.95,
+        tau_entropy: float = 0.99,
         learning_rate: float = 0.08,
         gate_alpha: float = 0.1,
         gate_delta: float = 0.25,

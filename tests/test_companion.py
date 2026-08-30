@@ -137,6 +137,27 @@ def test_correction_feedback_does_not_touch_clarifier_weights():
     assert p_after == p_before
 
 
+def test_relevant_profile_fact_is_not_swallowed_by_entropy_override():
+    """Binary entropy is very flat near its peak: entropy(0.44) is ~0.99,
+    almost as high as entropy(0.50)'s max of 1.0. With too-low a
+    tau_entropy, the entropy check silently overrides a perfectly good
+    mid-confidence PROCEED_WITH_FLAG decision back to ASK -- discarding
+    a profile fact that was already retrieved and relevant, even though
+    the raw confidence score alone would have said "proceed". This
+    reproduces that exact scenario and pins the fix (tau_entropy raised
+    from 0.95 to 0.99, so only genuinely ~50/50 confidence forces a
+    question)."""
+    c = Companion(domain=make_domain())
+    c.turn("u1", "hey")
+    c.give_feedback("u1", "correction", {"key": "k", "label": "A", "value": "A", "confidence": 1.0})
+    c.consolidate("u1")
+
+    result = c.turn("u1", "tell me about routines")
+
+    assert result.asked_clarifying is False
+    assert result.used_profile is True
+
+
 def test_general_and_study_domains_both_run():
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     from domains.general import GENERAL_DOMAIN

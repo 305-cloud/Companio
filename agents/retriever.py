@@ -42,7 +42,13 @@ class Retriever:
         events = self.store.read_episodic(external.user_id, limit=10)
         knowledge = self._search_domain_knowledge(external.text, domain)
 
-        retrieval_score = min(1.0, len(knowledge) / 2) if domain.domain_knowledge else 0.5
+        # A domain with no knowledge base at all (e.g. GENERAL_DOMAIN) has
+        # nothing to fall short of -- retrieval isn't a meaningful signal
+        # there, so it shouldn't read as "uncertain". 0.5 used to mean
+        # exactly that (maximal uncertainty to the entropy check), which
+        # left knowledge-less domains stuck asking the same static
+        # question on every turn regardless of what the user said.
+        retrieval_score = min(1.0, len(knowledge) / 2) if domain.domain_knowledge else 1.0
         profile_match_strength = min(1.0, len(facts) / 4)
 
         return RetrievalResult(

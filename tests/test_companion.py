@@ -158,6 +158,30 @@ def test_relevant_profile_fact_is_not_swallowed_by_entropy_override():
     assert result.used_profile is True
 
 
+def test_knowledgeless_domain_does_not_get_stuck_asking_forever():
+    """A domain with no domain_knowledge at all (like GENERAL_DOMAIN) used
+    to fall back to retrieval_score=0.5 -- meant as "neutral", but read by
+    the Clarifier as "maximally uncertain" (entropy peaks at p=0.5). With
+    empty required_slots too, every turn produced the exact same features
+    and therefore the exact same confidence, permanently trapped in the
+    entropy-forces-ASK zone: a fresh user got the identical clarifying
+    question no matter what they typed, forever, since profile_match_strength
+    never has a chance to grow without a first real response ever landing.
+    retrieval_score now defaults to 1.0 for a domain with no knowledge base
+    (nothing to fall short of), which moves confidence out of the trap."""
+    from domain import DomainConfig
+
+    knowledgeless = DomainConfig(
+        name="empty_domain", purpose="No fixed vertical, no knowledge base.",
+        required_slots=[], clarifying_question_bank=["Tell me more?"],
+        domain_knowledge=[],
+    )
+    c = Companion(domain=knowledgeless)
+    for text in ["hey", "i need advice", "how are you", "what's the capital of France"]:
+        result = c.turn("u1", text)
+        assert result.asked_clarifying is False
+
+
 def test_general_and_study_domains_both_run():
     sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
     from domains.general import GENERAL_DOMAIN

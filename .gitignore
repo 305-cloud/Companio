@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.env
+companion.db
+.pytest_cache/
+
+# raw chat exports dropped in domains/ for ingest_whatsapp.py -- never
+# commit these un-anonymized; only the pipeline's *_domain_knowledge.json
+# and *_chat_chunks.jsonl outputs are meant to ship
+domains/*.txt
+domains/WhatsApp*

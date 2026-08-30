@@ -1,0 +1,153 @@
+import os
+import sys
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+from agent import Companion  # noqa: E402
+from domain import DomainConfig  # noqa: E402
+
+
+def make_domain():
+    return DomainConfig(
+        name="test_domain",
+        purpose="Test purpose",
+        required_slots=["category"],
+        clarifying_question_bank=["Which category is this?"],
+        domain_knowledge=[
+            "Test knowledge snippet about routines and category items.",
+            "A second snippet, also about category routines.",
+        ],
+    )
+
+
+def test_first_turn_asks_clarifying_question_when_context_is_thin():
+    c = Companion(domain=make_domain())
+    result = c.turn("u1", "hey")
+    assert result.asked_clarifying is True
+    assert result.confidence < 0.4
+
+
+def test_turn_with_slot_filled_proceeds():
+    c = Companion(domain=make_domain())
+    result = c.turn("u1", "this is a category question about routines")
+    assert result.asked_clarifying is False
+    assert isinstance(result.response, str) and len(result.response) > 0
+
+
+def test_feedback_and_consolidation_creates_semantic_fact():
+    c = Companion(domain=make_domain())
+    c.turn("u1", "category routines question")
+    c.give_feedback("u1", "correction", {
+        "key": "pref_style", "label": "Prefers concise answers", "value": True, "confidence": 1.0,
+    })
+    c.consolidate("u1")
+    profile = c.profile("u1")
+    assert any(f["key"] == "pref_style" for f in profile)
+
+
+def test_reinforced_fact_gains_concentration():
+    c = Companion(domain=make_domain())
+    for _ in range(5):
+        c.give_feedback("u1", "correction", {"key": "k", "label": "A", "value": "A", "confidence": 1.0})
+        c.consolidate("u1")
+    fact = c._load_internal_state("u1").get("k")
+    assert fact.belief is not None
+    assert fact.belief.concentration > 5
+
+
+def test_strong_contradiction_marks_pending_not_silent_overwrite():
+    c = Companion(domain=make_domain())
+    for _ in range(10):
+        c.give_feedback("u1", "correction", {"key": "k", "label": "A", "value": "A", "confidence": 1.0})
+        c.consolidate("u1")
+    c.give_feedback("u1", "correction", {"key": "k", "label": "B", "value": "B", "confidence": 1.0})
+    c.consolidate("u1")
+    fact = c._load_internal_state("u1").get("k")
+    assert fact.status == "pending_confirmation"
+    assert fact.value == "A"
+    assert fact.pending_value == "B"
+
+
+def test_resolve_pending_accept_applies_staged_value():
+    c = Companion(domain=make_domain())
+    for _ in range(10):
+        c.give_feedback("u1", "correction", {"key": "k", "label": "A", "value": "A", "confidence": 1.0})
+        c.consolidate("u1")
+    c.give_feedback("u1", "correction", {"key": "k", "label": "B", "value": "B", "confidence": 1.0})
+    c.consolidate("u1")
+    c.resolve_pending("u1", "k", accept_update=True)
+    fact = c._load_internal_state("u1").get("k")
+    assert fact.status == "active"
+    assert fact.value == "B"
+
+
+def test_forget_removes_fact():
+    c = Companion(domain=make_domain())
+    c.give_feedback("u1", "correction", {"key": "k", "label": "A", "value": "A", "confidence": 1.0})
+    c.consolidate("u1")
+    assert c.forget("u1", "k") is True
+    assert c._load_internal_state("u1").get("k") is None
+
+
+def test_pii_is_flagged_in_episodic_log():
+    c = Companion(domain=make_domain())
+    c.turn("u1", "my email is test@example.com and category is routines")
+    events = c.store.read_episodic("u1")
+    assert any(e.pii for e in events if e.event_type == "input")
+
+
+def test_idempotent_write_does_not_duplicate():
+    from memory.store import EpisodicEvent, SOURCE_HUMAN, UnifiedMemoryStore
+    store = UnifiedMemoryStore()
+    event = EpisodicEvent.new("u1", SOURCE_HUMAN, "input", {"text": "hi"})
+    store.write_episodic(event)
+    store.write_episodic(event)
+    rows = store.read_episodic("u1")
+    assert len(rows) == 1
+
+
+def test_metrics_track_session_trend():
+    c = Companion(domain=make_domain())
+    c.turn("u1", "hey")
+    c.turn("u1", "category routines")
+    trend = c.adaptation_metrics("u1")
+    assert trend[0]["turns"] == 2
+
+
+def test_feedback_closes_clarifier_learning_loop():
+    c = Companion(domain=make_domain())
+    c.turn("u1", "hey")
+    features, _ = c._last_decision["u1"]
+    p_before = c.clarifier._score(features)
+    c.give_feedback("u1", "down")
+    p_after = c.clarifier._score(features)
+    assert p_after != p_before
+
+
+def test_correction_feedback_does_not_touch_clarifier_weights():
+    """A 'correction' teaches the memory system a fact -- it isn't a
+    judgment on whether the previous turn was right to ask or not, so it
+    shouldn't push a reward into the Clarifier the way 'up'/'down' do."""
+    c = Companion(domain=make_domain())
+    c.turn("u1", "hey")
+    features, _ = c._last_decision["u1"]
+    p_before = c.clarifier._score(features)
+    c.give_feedback("u1", "correction", {"key": "k", "label": "A", "value": "A", "confidence": 1.0})
+    p_after = c.clarifier._score(features)
+    assert p_after == p_before
+
+
+def test_general_and_study_domains_both_run():
+    sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+    from domains.general import GENERAL_DOMAIN
+    from domains.study import STUDY_DOMAIN
+
+    for domain in (GENERAL_DOMAIN, STUDY_DOMAIN):
+        c = Companion(domain=domain)
+        result = c.turn("u1", "hello there")
+        assert isinstance(result.response, str)
+
+
+if __name__ == "__main__":
+    import pytest
+    sys.exit(pytest.main([__file__, "-v"]))

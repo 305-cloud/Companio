@@ -109,7 +109,12 @@ def start_session(user_id: str, domain: str = "general") -> Dict[str, str]:
 @app.post("/api/turn")
 def turn(req: TurnRequest) -> Dict[str, Any]:
     companion = get_companion(req.domain)
-    result = companion.turn(req.user_id, req.text)
+    try:
+        result = companion.turn(req.user_id, req.text)
+    except Exception as exc:  # noqa: BLE001 -- surface the real LLM/backend error to the UI
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"{type(exc).__name__}: {exc}")
     return {
         "response": result.response,
         "asked_clarifying": result.asked_clarifying,

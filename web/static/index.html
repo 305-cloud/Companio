@@ -148,7 +148,11 @@ function qs(params) { return Object.entries(params).map(([k,v]) => `${encodeURIC
 
 async function api(path, opts) {
   const res = await fetch(path, opts);
-  if (!res.ok) throw new Error(await res.text());
+  if (!res.ok) {
+    const text = await res.text();
+    try { throw new Error(JSON.parse(text).detail || text); }
+    catch (e) { throw (e instanceof SyntaxError) ? new Error(text) : e; }
+  }
   return res.json();
 }
 

@@ -30,12 +30,16 @@ class Guide:
         retrieval: RetrievalResult,
         domain: DomainConfig,
         assumption_note: Optional[str] = None,
+        image_bytes: Optional[bytes] = None,
+        image_mime: Optional[str] = None,
     ) -> GuideResponse:
         context = {
             "system_prompt": domain.system_prompt or domain.purpose,
             "user_text": user_text,
             "semantic_facts": [f.as_dict() for f in retrieval.semantic_facts],
             "domain_knowledge": retrieval.domain_knowledge,
+            "image_bytes": image_bytes,
+            "image_mime": image_mime,
         }
         text = self.llm.generate(prompt="Respond helpfully and specifically to this user.", context=context)
         if assumption_note:

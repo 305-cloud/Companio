@@ -23,7 +23,13 @@ class StubBackend(LLMBackend):
             personalization = " "
 
         grounding = f"Referencing: {domain_knowledge[0]}. " if domain_knowledge else ""
+        image_note = (
+            " [an image was attached to this turn -- the stub backend can't actually see it; "
+            "set GEMINI_API_KEY to get real vision reasoning]"
+            if context.get("image_bytes") else ""
+        )
         return (
             f"{grounding}{personalization.strip()}here's my take on \"{user_text.strip()}\": "
             f"this looks consistent with your recent pattern; let me know if you'd like more detail."
+            f"{image_note}"
         )

@@ -29,6 +29,8 @@ class ExternalState:
     text: str
     context: Dict[str, Any] = field(default_factory=dict)
     timestamp: float = field(default_factory=time.time)
+    image_bytes: Optional[bytes] = None   # optional multimodal attachment for this turn
+    image_mime: Optional[str] = None       # e.g. "image/png" -- required if image_bytes is set
 
 
 @dataclass

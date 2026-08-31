@@ -38,5 +38,34 @@ def test_adk_backend_fails_fast_on_missing_key(monkeypatch):
         ADKBackend()
 
 
+def test_gemini_build_content_stays_a_plain_string_with_no_image():
+    """No image attached -- confirms multimodal support didn't change the
+    plain-text path any existing caller/test relies on."""
+    pytest.importorskip("google.genai")
+    from llm.gemini import GeminiBackend
+
+    context = {"semantic_facts": [], "domain_knowledge": [], "user_text": "hey"}
+    content = GeminiBackend._build_content("Respond.", context)
+    assert isinstance(content, str)
+
+
+def test_gemini_build_content_attaches_image_part_when_present():
+    """Verified against the real installed google-genai API: contents may
+    be a list mixing a bare str (auto-wrapped as a text Part) with a
+    types.Part -- see llm/gemini.py's _build_content docstring."""
+    pytest.importorskip("google.genai")
+    from google.genai import types as genai_types
+    from llm.gemini import GeminiBackend
+
+    context = {
+        "semantic_facts": [], "domain_knowledge": [], "user_text": "what's in this?",
+        "image_bytes": b"\x89PNG\r\n\x1a\n" + b"\x00" * 8, "image_mime": "image/png",
+    }
+    content = GeminiBackend._build_content("Respond.", context)
+    assert isinstance(content, list)
+    assert isinstance(content[0], str)
+    assert isinstance(content[1], genai_types.Part)
+
+
 if __name__ == "__main__":
     sys.exit(pytest.main([__file__, "-v"]))

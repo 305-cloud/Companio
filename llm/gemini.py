@@ -77,7 +77,7 @@ class GeminiBackend(LLMBackend):
 
     # ---------- internals ----------
 
-    def _call(self, contents: str, config: Optional[Any]):
+    def _call(self, contents: Any, config: Optional[Any]):
         last_error: Optional[BaseException] = None
         for attempt in range(_MAX_RETRIES + 1):
             try:
@@ -114,12 +114,22 @@ class GeminiBackend(LLMBackend):
         )
 
     @staticmethod
-    def _build_content(prompt: str, context: Dict[str, Any]) -> str:
+    def _build_content(prompt: str, context: Dict[str, Any]) -> Any:
+        """Returns a plain string normally, or a list `[text, Part]` when an
+        image is attached -- confirmed against the installed google-genai
+        API: `generate_content(contents=...)` accepts a list mixing a bare
+        str (auto-wrapped as a text Part) with `types.Part` objects, so no
+        image = fully unchanged behavior for every existing caller/test."""
         facts = "\n".join(f"- {f['label']} (confidence {f['confidence']})" for f in context.get("semantic_facts", []))
         knowledge = "\n".join(context.get("domain_knowledge", []))
-        return (
+        text = (
             f"What you know about this user:\n{facts or '(no prior facts yet)'}\n\n"
             f"Relevant domain knowledge:\n{knowledge or '(none)'}\n\n"
             f"User: {context.get('user_text', '')}\n\n"
             f"Instruction: {prompt}"
         )
+        image_bytes = context.get("image_bytes")
+        image_mime = context.get("image_mime")
+        if image_bytes and image_mime:
+            return [text, genai_types.Part.from_bytes(data=image_bytes, mime_type=image_mime)]
+        return text

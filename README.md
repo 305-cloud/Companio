@@ -41,6 +41,21 @@ The sidebar mirrors the CLI's `:profile` / `:feed` / `:metrics`
 commands live as you chat, plus one-click accept/keep on any fact
 staged as `pending_confirmation` by the Consolidator.
 
+### Multimodal input (images)
+
+Both interfaces can attach an image to a turn — the web app has a 📎
+button next to the message box, the CLI has `:image <path>` (stages
+it for your *next* message; bare `:image` clears it). On the stub
+backend it's just acknowledged in the reply; with a real Gemini
+backend (`--live` / a configured `GEMINI_API_KEY`) it's sent as an
+actual multimodal `Part` alongside the text, so the model genuinely
+sees it — verified against the real installed `google-genai` API
+(`Part.from_bytes(data=..., mime_type=...)`, mixed into the same
+`contents` list as the text). Nothing about the Clarifier, memory, or
+belief math changed to support this — it's carried as one optional
+field on `ExternalState`, threaded through `Guide`'s existing
+`context` dict.
+
 ## File map
 
 ```
@@ -140,7 +155,7 @@ python -m pytest tests/ -v
 
 ## Status
 
-Working, tested (28 tests). Both the CLI and the web app run
+Working, tested (33 tests). Both the CLI and the web app run
 end-to-end on real Gemini reasoning (via Google's Agent Development
 Kit) once a key is set, not just the built-in stub — verified live,
 including a full ask-vs-act / memory / contradiction-handling pass

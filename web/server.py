@@ -14,6 +14,7 @@ Run:
 
 from __future__ import annotations
 
+import base64
 import os
 import sys
 from typing import Any, Dict, List, Optional
@@ -74,10 +75,15 @@ def get_companion(domain_name: str) -> Companion:
 app = FastAPI(title="Companio")
 
 
+_MAX_IMAGE_BYTES = 8 * 1024 * 1024  # 8MB -- generous for a chat attachment, cheap to enforce
+
+
 class TurnRequest(BaseModel):
     user_id: str
     domain: str = "general"
     text: str
+    image_base64: Optional[str] = None  # data URI's base64 payload only, no "data:...;base64," prefix
+    image_mime: Optional[str] = None    # e.g. "image/png" -- required alongside image_base64
 
 
 class FeedbackRequest(BaseModel):
@@ -109,8 +115,18 @@ def start_session(user_id: str, domain: str = "general") -> Dict[str, str]:
 @app.post("/api/turn")
 def turn(req: TurnRequest) -> Dict[str, Any]:
     companion = get_companion(req.domain)
+    image_bytes = None
+    if req.image_base64:
+        if not req.image_mime:
+            raise HTTPException(status_code=400, detail="image_mime is required when image_base64 is set")
+        try:
+            image_bytes = base64.b64decode(req.image_base64, validate=True)
+        except Exception:
+            raise HTTPException(status_code=400, detail="image_base64 is not valid base64")
+        if len(image_bytes) > _MAX_IMAGE_BYTES:
+            raise HTTPException(status_code=413, detail=f"image exceeds {_MAX_IMAGE_BYTES // (1024*1024)}MB limit")
     try:
-        result = companion.turn(req.user_id, req.text)
+        result = companion.turn(req.user_id, req.text, image_bytes=image_bytes, image_mime=req.image_mime)
     except Exception as exc:  # noqa: BLE001 -- surface the real LLM/backend error to the UI
         import traceback
         traceback.print_exc()

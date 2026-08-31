@@ -96,6 +96,27 @@ def test_pii_is_flagged_in_episodic_log():
     assert any(e.pii for e in events if e.event_type == "input")
 
 
+def test_image_attachment_reaches_the_llm_backend():
+    """An image passed into turn() should flow ExternalState -> Guide ->
+    the LLM backend's context dict untouched, regardless of domain -- this
+    pins the whole multimodal wiring path (state.py, agent.py, guide.py)
+    in one end-to-end assertion rather than per-file unit tests."""
+    c = Companion(domain=make_domain())
+    fake_png = b"\x89PNG\r\n\x1a\n" + b"\x00" * 16
+    result = c.turn(
+        "u1", "this is a category question about routines -- what's in this image?",
+        image_bytes=fake_png, image_mime="image/png",
+    )
+    assert result.asked_clarifying is False
+    assert "image was attached" in result.response
+
+
+def test_turn_without_image_is_unaffected_by_the_new_parameters():
+    c = Companion(domain=make_domain())
+    result = c.turn("u1", "category routines question")
+    assert "image was attached" not in result.response
+
+
 def test_idempotent_write_does_not_duplicate():
     from memory.store import EpisodicEvent, SOURCE_HUMAN, UnifiedMemoryStore
     store = UnifiedMemoryStore()

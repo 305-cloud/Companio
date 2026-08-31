@@ -19,6 +19,10 @@ Commands inside the REPL:
     :consolidate      run the Consolidator now
     :forget <key>     delete a stored fact (privacy control)
     :newsession       start a new session (for metrics comparison)
+    :image <path>     stage an image, attached to your next message
+                      (bare ":image" clears a staged one); requires
+                      --live with a vision-capable model to actually
+                      be seen -- the stub just acknowledges it's there
     :quit
 
 Your profile/facts are saved to companion.db (created next to this file)
@@ -28,6 +32,7 @@ and persist across runs -- delete that file to start fresh.
 from __future__ import annotations
 
 import argparse
+import mimetypes
 import os
 import sys
 
@@ -117,7 +122,9 @@ def main() -> None:
     companion.new_session(args.user)
 
     print(f"\n[Companion] domain={domain.name} user={args.user} storage={db_path}")
-    print("Type a message, or a : command (:profile, :feed, :metrics, :quit)\n")
+    print("Type a message, or a : command (:profile, :feed, :metrics, :image <path>, :quit)\n")
+
+    pending_image: dict = {"bytes": None, "mime": None, "path": None}
 
     while True:
         try:
@@ -162,8 +169,26 @@ def main() -> None:
             elif line == ":newsession":
                 companion.new_session(args.user)
                 print("  (new session started)")
+            elif line == ":image":
+                pending_image = {"bytes": None, "mime": None, "path": None}
+                print("  (image cleared)")
+            elif line.startswith(":image "):
+                path = line.split(" ", 1)[1].strip()
+                mime, _ = mimetypes.guess_type(path)
+                if not mime or not mime.startswith("image/"):
+                    print(f"  [error] '{path}' doesn't look like an image file (guessed type: {mime})")
+                else:
+                    with open(path, "rb") as fh:
+                        pending_image = {"bytes": fh.read(), "mime": mime, "path": path}
+                    print(f"  (image staged: {path} -- it'll be attached to your next message)")
             else:
-                result = companion.turn(args.user, line)
+                result = companion.turn(
+                    args.user, line,
+                    image_bytes=pending_image["bytes"], image_mime=pending_image["mime"],
+                )
+                if pending_image["bytes"]:
+                    print(f"  (sent with image: {pending_image['path']})")
+                    pending_image = {"bytes": None, "mime": None, "path": None}
                 tag = "ASK" if result.asked_clarifying else ("PROFILE" if result.used_profile else "GENERIC")
                 print(f"companion [{tag}, confidence={result.confidence:.2f}]> {result.response}")
                 if result.pending_confirmations:

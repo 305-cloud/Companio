@@ -110,7 +110,12 @@ class ADKBackend(LLMBackend):
 
     def generate(self, prompt: str, context: Dict[str, Any]) -> str:
         full_prompt = self._build_content(prompt, context)
-        message = genai_types.Content(role="user", parts=[genai_types.Part(text=full_prompt)])
+        parts = [genai_types.Part(text=full_prompt)]
+        image_bytes = context.get("image_bytes")
+        image_mime = context.get("image_mime")
+        if image_bytes and image_mime:
+            parts.append(genai_types.Part.from_bytes(data=image_bytes, mime_type=image_mime))
+        message = genai_types.Content(role="user", parts=parts)
 
         final_text: Optional[str] = None
         try:

@@ -80,8 +80,18 @@ class Companion:
 
     # ---------- the loop ----------
 
-    def turn(self, user_id: str, text: str, context: Optional[Dict[str, Any]] = None) -> TurnResult:
-        external = ExternalState(user_id=user_id, text=text, context=context or {})
+    def turn(
+        self,
+        user_id: str,
+        text: str,
+        context: Optional[Dict[str, Any]] = None,
+        image_bytes: Optional[bytes] = None,
+        image_mime: Optional[str] = None,
+    ) -> TurnResult:
+        external = ExternalState(
+            user_id=user_id, text=text, context=context or {},
+            image_bytes=image_bytes, image_mime=image_mime,
+        )
         internal = self._load_internal_state(user_id)
 
         input_event = EpisodicEvent.new(user_id, SOURCE_HUMAN, "input", {"text": text})
@@ -107,7 +117,10 @@ class Companion:
         if decision.action == Action.PROCEED_WITH_FLAG:
             assumption_note = "I'm inferring this from limited context so far -- correct me if I'm off."
 
-        guide_response = self.guide.respond(text, retrieval, self.domain, assumption_note)
+        guide_response = self.guide.respond(
+            text, retrieval, self.domain, assumption_note,
+            image_bytes=external.image_bytes, image_mime=external.image_mime,
+        )
 
         transformer_event = EpisodicEvent.new(
             user_id, SOURCE_TRANSFORMER, "generation",

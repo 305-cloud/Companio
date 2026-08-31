@@ -77,6 +77,13 @@
   .composer input:focus { outline:none; border-color:var(--accent); }
   .composer button { background:var(--accent); color:#04101c; border:none; border-radius:8px; padding:0 20px; font-weight:600; cursor:pointer; }
   .composer button:disabled { opacity:.5; cursor:default; }
+  .attach-btn { background:var(--panel); border:1px solid var(--border); color:var(--muted); border-radius:8px; padding:0 14px; font-size:16px; cursor:pointer; }
+  .attach-btn:hover { border-color:var(--accent); color:var(--accent); }
+  .attach-btn.active { border-color:var(--green); color:var(--green); }
+  .image-preview { padding:0 20px 10px; display:flex; align-items:center; gap:10px; }
+  .image-preview img { height:56px; border-radius:8px; border:1px solid var(--border); }
+  .image-preview .remove { background:none; border:1px solid var(--border); color:var(--muted); border-radius:6px; padding:3px 9px; font-size:12px; cursor:pointer; }
+  .bubble img.attached { display:block; max-width:280px; border-radius:8px; margin-bottom:8px; }
 
   ::-webkit-scrollbar { width:8px; } ::-webkit-scrollbar-thumb { background:#30363d; border-radius:4px; }
 </style>
@@ -126,7 +133,10 @@
     <div class="messages" id="messages">
       <div class="empty" style="padding:20px;">Say something to get started.</div>
     </div>
+    <div class="image-preview" id="imagePreview" style="display:none;"></div>
     <div class="composer">
+      <input type="file" id="imageInput" accept="image/*" style="display:none;" />
+      <button id="attachBtn" class="attach-btn" title="Attach an image">&#128206;</button>
       <input id="textInput" placeholder="Type a message..." autocomplete="off" />
       <button id="sendBtn">Send</button>
     </div>
@@ -139,8 +149,12 @@ const userIdEl = document.getElementById('userId');
 const domainSelEl = document.getElementById('domainSel');
 const textInputEl = document.getElementById('textInput');
 const sendBtnEl = document.getElementById('sendBtn');
+const imageInputEl = document.getElementById('imageInput');
+const attachBtnEl = document.getElementById('attachBtn');
+const imagePreviewEl = document.getElementById('imagePreview');
 
 let lastEventId = null;
+let pendingImage = null; // { dataUrl, base64, mime }
 
 function currentUser() { return userIdEl.value.trim() || 'demo-user'; }
 function currentDomain() { return domainSelEl.value; }
@@ -158,13 +172,21 @@ async function api(path, opts) {
 
 function clearEmpty(el) { const e = el.querySelector('.empty'); if (e && el.children.length === 1) el.innerHTML = ''; }
 
-function addMessage(role, text, meta) {
+function addMessage(role, text, meta, imageDataUrl) {
   clearEmpty(messagesEl);
   const wrap = document.createElement('div');
   wrap.className = 'msg ' + role + (meta && meta.asked_clarifying ? ' ask' : '');
   const bubble = document.createElement('div');
   bubble.className = 'bubble';
-  bubble.textContent = text;
+  if (imageDataUrl) {
+    const img = document.createElement('img');
+    img.className = 'attached';
+    img.src = imageDataUrl;
+    bubble.appendChild(img);
+  }
+  const textNode = document.createElement('div');
+  textNode.textContent = text;
+  bubble.appendChild(textNode);
   wrap.appendChild(bubble);
 
   if (role === 'agent' && meta) {
@@ -208,16 +230,49 @@ async function sendFeedback(rating, up, down) {
   refreshSidebar();
 }
 
+attachBtnEl.onclick = () => imageInputEl.click();
+
+imageInputEl.addEventListener('change', () => {
+  const file = imageInputEl.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    const dataUrl = reader.result; // "data:image/png;base64,AAAA..."
+    const base64 = dataUrl.split(',')[1];
+    pendingImage = { dataUrl, base64, mime: file.type };
+    imagePreviewEl.style.display = 'flex';
+    imagePreviewEl.innerHTML = '';
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    const remove = document.createElement('button');
+    remove.className = 'remove';
+    remove.textContent = 'remove image';
+    remove.onclick = () => { pendingImage = null; imagePreviewEl.style.display = 'none'; imageInputEl.value = ''; };
+    imagePreviewEl.appendChild(img);
+    imagePreviewEl.appendChild(remove);
+    attachBtnEl.classList.add('active');
+  };
+  reader.readAsDataURL(file);
+});
+
 async function sendTurn() {
   const text = textInputEl.value.trim();
-  if (!text) return;
+  const image = pendingImage;
+  if (!text && !image) return;
   textInputEl.value = '';
+  pendingImage = null;
+  imagePreviewEl.style.display = 'none';
+  imagePreviewEl.innerHTML = '';
+  imageInputEl.value = '';
+  attachBtnEl.classList.remove('active');
   sendBtnEl.disabled = true;
-  addMessage('user', text);
+  addMessage('user', text, null, image ? image.dataUrl : null);
   try {
+    const body = { user_id: currentUser(), domain: currentDomain(), text };
+    if (image) { body.image_base64 = image.base64; body.image_mime = image.mime; }
     const result = await api('/api/turn', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({ user_id: currentUser(), domain: currentDomain(), text })
+      body: JSON.stringify(body)
     });
     addMessage('agent', result.response, result);
   } catch (e) {

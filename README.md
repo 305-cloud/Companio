@@ -140,6 +140,10 @@ python -m pytest tests/ -v
 
 ## Status
 
-Working, tested (20 tests). Deployment (Cloud Run/Firestore) is
+Working, tested (28 tests). Both the CLI and the web app run
+end-to-end on real Gemini reasoning (via Google's Agent Development
+Kit) once a key is set, not just the built-in stub — verified live,
+including a full ask-vs-act / memory / contradiction-handling pass
+through the actual web UI. Deployment (Cloud Run/Firestore) is
 deliberately not live in this build — see the project's own notes for
 why and what a real deploy would need.
